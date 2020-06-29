@@ -1,7 +1,9 @@
 package parse
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -27,9 +29,58 @@ type Page struct {
 	Url  string
 }
 
+var htmlContent = `<div class="paginator">
+        <span class="prev">
+            <link rel="prev" href="?start=75&amp;filter=">
+            <a href="?start=75&amp;filter=">&lt;前页</a>
+        </span>
+        
+        
+
+                
+            <a href="?start=0&amp;filter=">1</a>
+        
+                
+            <a href="?start=25&amp;filter=">2</a>
+        
+                
+            <a href="?start=50&amp;filter=">3</a>
+        
+                
+            <a href="?start=75&amp;filter=">4</a>
+        
+                <span class="thispage">5</span>
+                
+            <a href="?start=125&amp;filter=">6</a>
+        
+                
+            <a href="?start=150&amp;filter=">7</a>
+        
+                
+            <a href="?start=175&amp;filter=">8</a>
+        
+                
+            <a href="?start=200&amp;filter=">9</a>
+        
+                
+            <a href="?start=225&amp;filter=">10</a>
+        
+        <span class="next">
+            <link rel="next" href="?start=125&amp;filter=">
+            <a href="?start=125&amp;filter=">后页&gt;</a>
+        </span>
+
+            <span class="count">(共250条)</span>
+        </div>`
+
 // 获取分页
 func GetPages(url string) []Page {
-	doc, err := goquery.NewDocument(url)
+	client := &http.Client{}
+	defer client.CloseIdleConnections()
+	request, err := GetClient(url)
+	res, err := client.Do(request)
+	defer res.Body.Close()
+	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,19 +88,47 @@ func GetPages(url string) []Page {
 	return ParsePages(doc)
 }
 
+var Headers = map[string]string{
+	"Host":                      "movie.douban.com",
+	"Connection":                "keep-alive",
+	"Cache-Control":             "max-age=0",
+	"Upgrade-Insecure-Requests": "1",
+	"User-Agent":                "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36",
+	"Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+	"Referer":                   "https://movie.douban.com/top250",
+}
+
+func GetClient(baseUrl string) (*http.Request, error) {
+	req, err := http.NewRequest("GET", baseUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	for index, header := range Headers {
+		req.Header.Add(index, header)
+	}
+	return req, nil
+}
+
 // 分析分页
 func ParsePages(doc *goquery.Document) (pages []Page) {
 	pages = append(pages, Page{Page: 1, Url: ""})
-	doc.Find("#content > div > div.article > div.paginator > a").Each(func(i int, s *goquery.Selection) {
+	//doc, err := goquery.NewDocumentFromReader(doc.)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+	doc.Find(".paginator>a").Each(func(i int, s *goquery.Selection) {
 		page, _ := strconv.Atoi(s.Text())
+		fmt.Println(s.Text())
 		url, _ := s.Attr("href")
+		fmt.Println("url", url)
 
 		pages = append(pages, Page{
 			Page: page,
 			Url:  url,
 		})
 	})
-
+	fmt.Println("pages:", len(pages))
 	return pages
 }
 

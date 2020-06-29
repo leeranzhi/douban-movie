@@ -2,13 +2,13 @@
 package main
 
 import (
+	"douban-movie/model"
+	"douban-movie/parse"
 	"log"
+	"net/http"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-
-	"github.com/go-crawler/douban-movie/model"
-	"github.com/go-crawler/douban-movie/parse"
 )
 
 var (
@@ -29,8 +29,15 @@ func Start() {
 	var movies []parse.DoubanMovie
 
 	pages := parse.GetPages(BaseUrl)
+
+	client := &http.Client{}
+
 	for _, page := range pages {
-		doc, err := goquery.NewDocument(strings.Join([]string{BaseUrl, page.Url}, ""))
+		request, err := parse.GetClient(strings.Join([]string{BaseUrl, page.Url}, ""))
+		response, err := client.Do(request)
+		defer response.Body.Close()
+
+		doc, err := goquery.NewDocumentFromReader(response.Body)
 		if err != nil {
 			log.Println(err)
 		}
